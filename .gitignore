@@ -1,10 +1,2 @@
 # Compressed files
-*.zipnode_modules/
-.next/
-dist/
-build/
-*.log
-node_modules/
-__pycache__/
-*.pyc
-pvz_randomizer.zip
+*.zip
