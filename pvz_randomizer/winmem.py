@@ -65,10 +65,18 @@ class MemoryError_(Exception):
     pass
 
 
-def find_process(name: str = " Plants.exe"):
-    """Вернуть PID процесса по имени exe (регистронезависимо). None если нет."""
+def find_process(name):
+    """Вернуть PID процесса. Принимает имя или список имён exe
+    (регистронезависимо, можно без расширения — 'Plants' == 'Plants.exe').
+    None если ничего не найдено."""
     _require_windows()
-    name = name.strip().lower()
+    names = name if isinstance(name, (list, tuple)) else [name]
+    norm = set()
+    for n in names:
+        n = n.strip().lower()
+        if not n.endswith(".exe"):
+            n += ".exe"
+        norm.add(n)
     snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     try:
         entry = PROCESSENTRY32()
@@ -76,12 +84,31 @@ def find_process(name: str = " Plants.exe"):
         if not kernel32.Process32First(snap, ctypes.byref(entry)):
             return None
         while True:
-            if entry.szExeFile.lower() == name:
+            if entry.szExeFile.lower() in norm:
                 return int(entry.th32ProcessID)
             if not kernel32.Process32Next(snap, ctypes.byref(entry)):
                 return None
     finally:
         kernel32.CloseHandle(snap)
+
+
+def list_processes():
+    """Список имён всех процессов — для диагностики ('какое имя у твоей игры?')."""
+    _require_windows()
+    result = []
+    snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    try:
+        entry = PROCESSENTRY32()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        if not kernel32.Process32First(snap, ctypes.byref(entry)):
+            return result
+        while True:
+            result.append(entry.szExeFile)
+            if not kernel32.Process32Next(snap, ctypes.byref(entry)):
+                break
+    finally:
+        kernel32.CloseHandle(snap)
+    return result
 
 
 def open_process(pid: int) -> wintypes.HANDLE:

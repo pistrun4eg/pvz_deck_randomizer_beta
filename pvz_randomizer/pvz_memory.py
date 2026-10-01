@@ -16,8 +16,20 @@ import time
 import winmem
 from seed_data import seed_name
 
-MODULE_NAME = "Plants.exe"          # имя процесса в диспетчере задач
+# Steam-версия (PopCap/GOTY) запускается как PlantsVsZombies.exe.
+# Разные издания/сборки: Plants.exe, PlantsVsZombies.exe и т.п. —
+# поэтому ищем по списку + «похожие» имена.
+MODULE_NAMES = [
+    "PlantsVsZombies.exe",   # Steam / Origin / Retail GOTY
+    "Plants.exe",            # старые репаки / фанатские сборки
+    "Plants_Vz1.exe",        # некоторые локализации/сборки
+]
 BASE_SYMBOL = 0x8C0000              # статический адрес базы GOTY-сборки
+
+
+def _looks_like_pvz(name: str) -> bool:
+    n = name.lower()
+    return ("plants" in n and "zombi" in n) or n == "plants.exe"
 
 # Цепочки (в нотации Cheat Engine): [[BASE]+o1]+o2 ...
 CHAIN_SEEDPACKET   = [0x9F790, 0x40]   # -> структура SeedPacket текущей плашки
@@ -34,10 +46,22 @@ class PvzMemory:
 
     # ---------- подключение ----------
     def attach(self):
-        pid = winmem.find_process(MODULE_NAME)
+        pid = winmem.find_process(MODULE_NAMES)
+        if pid is None:
+            # не угадали точное имя — ищем любой процесс, похожий на PvZ
+            try:
+                for pname in winmem.list_processes():
+                    if _looks_like_pvz(pname):
+                        pid = winmem.find_process(pname)
+                        if pid:
+                            print(f"[память] Нашёл игру под именем: {pname}")
+                            break
+            except Exception:
+                pass
         if pid is None:
             raise RuntimeError(
-                f"Процесс {MODULE_NAME} не найден. Сначала запусти игру.")
+                f"Процесс игры не найден (искал: {', '.join(MODULE_NAMES)}). "
+                "Сначала запусти саму игру (не лаунчер/Steam).")
         self.pid = pid
         self.h = winmem.open_process(pid)
         return self
